@@ -1,0 +1,99 @@
+nclude "photpropservices_dune.fcl"
+#include "services_dune.fcl"
+#include "backtrackerservice.fcl"
+#include "particleinventoryservice.fcl"
+#include "singles.fcl"
+#include "largeantmodules.fcl"
+#include "detsimmodules.fcl"
+#include "opticaldetectormodules_dune.fcl"
+#include "opticaldetectorservices_dune.fcl"
+#include "photolibbuild_services_dune.fcl"
+#include "photpropservices_dune.fcl"
+#include "lightsource.fcl"
+#include "LArG4_dune.fcl"
+
+
+
+
+#include "services_refactored_pdune.fcl"
+#include "singles_dune.fcl"
+#include "corsika_protodune.fcl"
+#include "CORSIKAGendp.fcl"
+#include "dune_radiological_model.fcl"
+
+
+
+
+
+process_name: SinglesGen
+
+services:
+{
+  # Load the service that manages root files for histograms.
+  TFileService: { fileName: "protodunevd_optical_full_sim_hist.root" }
+  TimeTracker:       {}
+  RandomNumberGenerator: {} #ART native random number generator
+  message:      @local::standard_info
+  @table::protodunevd_refactored_simulation_services
+}
+
+services.PhotonVisibilityService: @local::protodune_photonvisibilityservice
+#protoduneVD workspace geometry
+services.Geometry:              @local::dune10kt_geo
+
+services.LArG4Parameters.UseCustomPhysics: true
+services.LArG4Parameters.EnabledPhysics: [ "Em",
+                                           "Optical",
+                                           "SynchrotronAndGN",
+                                           "Ion",
+                                           "Hadron",
+                                           "Decay",
+                                           "HadronElastic",
+                                           "Stopping",
+                                           "NeutronTrackingCut" ]
+
+services.Geometry.GDML: "protodunevd_v3_refactored.gdml"
+services.Geometry.ROOT: "protodunevd_v3_refactored.gdml"
+
+
+
+#Start each new event with an empty event.
+source:
+{
+  module_type: EmptyEvent
+  timestampPlugin: { plugin_type: "GeneratedEventTimestamp" }
+  maxEvents:   10           # Number of events to create
+  firstRun:    1           # Run number to use for this file
+  firstEvent:  1           # number of first event in the file
+}
+
+
+
+
+physics: {
+
+ producers:
+ {
+   generator: @local::standard_lightsource
+   largeant:  @local::standard_largeant
+ }
+
+  analyzers: {
+    pmtresponse: {
+      module_type:  SimPhotonCounter
+      GeneratorModule:            "generator"
+      Verbosity:                   0 # quiet!
+      MakeAllPhotonsTree:      true
+      MakeDetectedPhotonsTree: true
+      MakeOpDetsTree:          true
+      MakeOpDetEventsTree:     true
+      MakeLightAnalysisTree:   true
+    }
+  } # analyzers
+
+  simulate:  [ generator, largeant ]
+  analyzeIt: [ pmtresponse ]
+
+}
+physics.producers.generator.SourceMode: 2
+physics.producers.generator.SteeringFile:  "./SteeringFile.txt"
